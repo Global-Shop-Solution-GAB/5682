@@ -1,0 +1,169 @@
+Program.Sub.ScreenSU.Start
+Gui.FormTime..Create
+Gui.FormTime..Caption("Dayforce Raw Punch Import ")
+Gui.FormTime..Size(6015,2055)
+Gui.FormTime..MinX(0)
+Gui.FormTime..MinY(0)
+Gui.FormTime..Position(0,0)
+Gui.FormTime..BackColor(-2147483633)
+Gui.FormTime..MousePointer(0)
+Gui.FormTime..Event(UnLoad,FormTime_UnLoad)
+Gui.FormTime.dtpBeg.Create(DatePicker)
+Gui.FormTime.dtpBeg.Size(1935,285)
+Gui.FormTime.dtpBeg.Position(150,390)
+Gui.FormTime.dtpEnd.Create(DatePicker)
+Gui.FormTime.dtpEnd.Size(1935,285)
+Gui.FormTime.dtpEnd.Position(2385,390)
+Gui.FormTime.lblBeg.Create(Label,"Beginning Date",True,1935,255,0,150,165,True,0,"Arial",8,-2147483633,0)
+Gui.FormTime.lblEnd.Create(Label,"Ending Date",True,1935,255,0,2385,165,True,0,"Arial",8,-2147483633,0)
+Gui.FormTime.cmdGen.Create(Button)
+Gui.FormTime.cmdGen.Size(1305,480)
+Gui.FormTime.cmdGen.Position(105,1035)
+Gui.FormTime.cmdGen.Caption("Generate File")
+Gui.FormTime.cmdGen.Event(Click,cmdGen_Click)
+Program.Sub.ScreenSU.End
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	
+	Gui.FormTime..Show
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5682_Ceridian_Dayforce.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.End
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.Get_Data.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	V.Local.sFile.Declare(String,"")
+	V.Local.sSql.Declare(String,"")
+	V.Local.i.Declare(Long,0)
+	V.Local.sDate.Declare(String,"")
+	V.Local.sTime.Declare(String,"")
+	V.Local.sBeg.Declare(String,"")
+	V.Local.sEnd.Declare(String,"")
+	V.Local.bRet.Declare(Boolean,False)
+	V.Local.sData.Declare(String,"")
+	
+	V.Local.sBeg.Set(V.Screen.FormTime!dtpBeg.Value)
+	V.Local.sEnd.Set(V.Screen.FormTime!dtpEnd.Value)
+	
+	F.Intrinsic.Control.If(V.Caller.GlobalDir.Right1,<>,"\")
+		F.Intrinsic.String.Build("{0}\Custom",V.Caller.GlobalDir,V.Local.sFile)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("{0}Custom",V.Caller.GlobalDir,V.Local.sFile)
+	F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.File.DirExists(V.Local.sFile,V.Local.bRet)
+	
+	F.Intrinsic.Control.If(V.Local.bRet,=,False)
+		F.Intrinsic.File.CreateDir(V.Local.sFile)
+	F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.String.Build("{0}\5682",V.Local.sFile,V.Local.sFile)
+	
+	F.Intrinsic.File.DirExists(V.Local.sFile,V.Local.bRet)
+	
+	F.Intrinsic.Control.If(V.Local.bRet,=,False)
+		F.Intrinsic.File.CreateDir(V.Local.sFile)
+	F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.String.Build("{0}\{1}.XML",V.Local.sFile,V.Ambient.Date.PervasiveDate,V.Local.sFile)
+	
+	F.ODBC.Connection!Con.OpenCompanyCOnnection
+	F.Intrinsic.String.Build("Select Employee, Date_In, Time_In, Date_Out, Time_Out From V_Time_Attendance Where Charge_Date Between '{0}' and '{1}' and Clocked_In <> 'Y'",V.Local.sBeg.PervasiveDate,V.Local.sEnd.PervasiveDate,V.Local.sSql)
+	F.Data.DataTable.CreateFromSQL("Time","con",V.Local.sSql)
+	F.ODBC.Connection!Con.Close
+	
+	F.Data.DataTable.Create("RawPunch",True)
+	F.Data.DataTable.AddColumn("RawPunch","BadgeId",String)
+	F.Data.DataTable.AddColumn("RawPunch","DeviceName",String)
+	F.Data.DataTable.AddColumn("RawPunch","Time",String)
+	F.Data.DataTable.AddColumn("RawPunch","Type",String)
+	
+	F.Intrinsic.Control.For(V.Local.i,0,V.DataTable.Time.RowCount--,1)
+		V.Local.sDate.Set(V.DataTable.Time(V.Local.i).Date_In!FieldVal)
+		F.Intrinsic.String.Build("{0}T{1}",V.Local.sDate.PervasiveDate,V.DataTable.Time(V.Local.i).Time_In!FieldVal,V.Local.sDate)
+		F.Data.DataTable.AddRow("RawPunch","BadgeId",V.DataTable.Time(V.Local.i).Employee!FieldVal,"DeviceName","WebClock","Time",V.Local.sDate,"Type","1")
+		V.Local.sDate.Set(V.DataTable.Time(V.Local.i).Date_Out!FieldVal)
+		F.Intrinsic.Control.If(V.Local.sDate.PervasiveDate,<>,"1900-01-01")
+			F.Intrinsic.String.Build("{0}T{1}",V.Local.sDate.PervasiveDate,V.DataTable.Time(V.Local.i).Time_Out!FieldVal,V.Local.sDate)
+			F.Data.DataTable.AddRow("RawPunch","BadgeId",V.DataTable.Time(V.Local.i).Employee!FieldVal,"DeviceName","WebClock","Time",V.Local.sDate,"Type","6")
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Next(V.Local.i)
+	
+	F.Intrinsic.Control.If(V.DataTable.RawPunch.RowCount--,<>,-1)
+		F.Data.DataTable.SaveToXML("RawPunch",1,True,V.Local.sFile)
+		
+		F.Intrinsic.File.File2String(V.Local.sFile,V.Local.sData)
+		F.Intrinsic.String.Replace(V.Local.sData,"<NewDataSet>","<RawPunchImport>",V.Local.sData)
+		F.Intrinsic.String.Replace(V.Local.sData,"</NewDataSet>","</RawPunchImport>",V.Local.sData)
+		
+		F.Intrinsic.File.String2File(V.Local.sFile,V.Local.sData)
+		
+		F.Intrinsic.String.Build("File Saved to: {0}",V.Local.sFile,V.Local.sFile)
+		F.Intrinsic.UI.Msgbox(V.Local.sFile)
+	
+	F.Intrinsic.Control.Else
+		F.Intrinsic.UI.Msgbox("No Time Records for Selected Dates.....")
+	F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5682_Ceridian_Dayforce.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(FormTime_Unload)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.Get_Data.End
+
+Program.Sub.FormTime_UnLoad.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	
+	F.Intrinsic.Control.End
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5682_Ceridian_Dayforce.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.End
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.FormTime_UnLoad.End
+
+Program.Sub.cmdGen_Click.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	
+	Gui.FormTime..Visible(Valse)
+	
+	F.Intrinsic.UI.InvokeWaitDialog("Generationg Import XML file.................")
+	F.Intrinsic.Control.CallSub(Get_Data)
+	F.Intrinsic.UI.CloseWaitDialog
+	
+	F.Intrinsic.Control.CallSub(FormTime_Unload)
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5682_Ceridian_Dayforce.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(FormTime_Unload)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.cmdGen_Click.End
